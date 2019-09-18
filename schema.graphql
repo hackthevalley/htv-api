@@ -1,0 +1,145 @@
+
+enum form_types{
+    TEXT
+    TEXTAREA
+    CHECKBOX
+    MULTI_CHECKBOX
+}
+enum status{
+    PENDING
+    WAITLISTED
+    ACCEPTED
+    DECLINED
+    REJECTED
+}
+enum gender{
+    MALE
+    FEMALE
+    UNDEFINED
+}
+type Link{
+    name: String!
+    href: String!
+}
+type Response{
+    question: Question!
+    answer: [String!]!
+}
+type Question{
+    id: String!
+    title: String!
+    info: String!
+    options: [String!]!
+    default: String!
+    type:form_types!
+    required: Boolean!
+}
+type Date{
+    date: String!
+}
+ 
+type User{
+    id: String!
+    status: status!
+    email: String!
+    firstname: String!
+    lastname: String!
+    gender:gender!
+    school: String!
+    bio: String!
+    photo: String!
+    created_at: Date!
+    links: [Link!]!
+}
+type Application{
+    id: String!
+    created_at: Date!     updated_at: Date!
+    form: Form!
+    user: User!
+    responses: [Response!]!
+}
+type Form{
+    id: String!
+    title: String!
+    questions: [Question!]!
+    open: Boolean!
+    ends_at: Date!
+    created_at: Date!
+}
+input CreateUser{
+    email: String!
+    firstname: String!
+    lastname: String!
+    gender:gender!
+    school: String!
+    bio: String!
+    photo: String!
+    links: [String!]!
+}
+input ReadUser{
+    email: String!
+}
+input UpdateUser{
+    status: status!
+    email: String!
+    firstname: String!
+    lastname: String!
+    gender:gender!
+    school: String!
+    bio: String!
+    photo: String!
+    links: [String!]!
+}
+input DeleteUser{
+    email: String!
+}
+input CreateApplication{
+    form: String!
+    user: String!
+    responses: [Response!]!
+}
+input ReadApplication{
+    id: String!
+}
+input UpdateApplication{
+    id: String!
+    form: String!
+    user: String!
+    responses: [Response!]!
+}
+input DeleteApplication{
+    id: String!
+}
+input CreateForm{
+    title: String!
+    questions: [Question!]!
+    open: Boolean!
+    ends_at: Date!
+}
+input ReadForm{
+    id: String!
+}
+input UpdateForm{
+    id: String!
+    title: String!
+    questions: [Question!]!
+    open: Boolean!
+    ends_at: Date!
+}
+input DeleteForm{
+    id: String!
+}
+type Mutation{
+    readUser(input: ReadUser!): User!
+    createUser(input: CreateUser!): User!
+    updateUser(input: UpdateUser!): User!
+    deleteUser(input: DeleteUser!): User!
+    createApp(input:CreateApplication!):Application!
+    readApp(input:ReadApplication!):Application!
+    updateApp(input:UpdateApplication!):Application!
+    deleteApp(input:DeleteApplication!):Application!
+    createForm(input:CreateForm!):Form!
+    readForm(input:ReadForm!):Form!
+    updateForm(input:UpdateForm!):Form!
+    deleteForm(input:DeleteForm!):Form!
+}
