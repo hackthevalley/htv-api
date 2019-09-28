@@ -1,4 +1,3 @@
-
 enum form_types{
     TEXT
     TEXTAREA
@@ -17,15 +16,18 @@ enum gender{
     FEMALE
     UNDEFINED
 }
+
 type Link{
-    name: String!
-    href: String!
+    label: String
+    url: String!
 }
-type Response{
-    question: Question!
-    answer: [String!]!
+
+input LinkInput{
+    label: String
+    url: String!
 }
-type Question{
+
+type Question {
     id: String!
     title: String!
     info: String!
@@ -34,12 +36,42 @@ type Question{
     type:form_types!
     required: Boolean!
 }
-type Date{
-    date: String!
+
+input QuestionInput{
+    id: String!
+    title: String!
+    info: String!
+    options: [String!]!
+    default: String!
+    type:form_types!
+    required: Boolean!
 }
- 
+
+type Date{
+    day: Int!
+    month: Int!
+    year: Int!
+}
+
+input DateInput{
+    day: Int!
+    month: Int!
+    year: Int!
+}
+
+type Response{
+    question: Question!
+    answer: [String!]!
+}
+
+input ResponseInput{
+    question: QuestionInput!
+    answer: [String!]!
+}
+
 type User{
     id: String!
+    links: [Link]
     status: status!
     email: String!
     firstname: String!
@@ -49,97 +81,78 @@ type User{
     bio: String!
     photo: String!
     created_at: Date!
-    links: [Link!]!
 }
+
 type Application{
     id: String!
-    created_at: Date!     updated_at: Date!
+    created_at: Date!
+    updated_at: Date!
     form: Form!
     user: User!
-    responses: [Response!]!
+    responses: [Response]!
 }
+
 type Form{
     id: String!
     title: String!
-    questions: [Question!]!
+    questions: [Question]!
     open: Boolean!
     ends_at: Date!
     created_at: Date!
 }
+
 input CreateUser{
     email: String!
-    firstname: String!
-    lastname: String!
-    gender:gender!
-    school: String!
-    bio: String!
-    photo: String!
-    links: [String!]!
+    firstname: String
+    lastname: String
+    gender: gender
+    school: String
+    bio: String
+    photo: String
+    links: [LinkInput]
 }
-input ReadUser{
-    email: String!
-}
+
 input UpdateUser{
-    status: status!
-    email: String!
-    firstname: String!
-    lastname: String!
-    gender:gender!
-    school: String!
-    bio: String!
-    photo: String!
-    links: [String!]!
+    status: status
+    email: String
+    firstname: String
+    lastname: String
+    gender:gender
+    school: String
+    bio: String
+    photo: String
+    links: [LinkInput]
 }
-input DeleteUser{
-    email: String!
-}
-input CreateApplication{
-    form: String!
-    user: String!
-    responses: [Response!]!
-}
-input ReadApplication{
-    id: String!
-}
-input UpdateApplication{
-    id: String!
-    form: String!
-    user: String!
-    responses: [Response!]!
-}
-input DeleteApplication{
-    id: String!
-}
+
 input CreateForm{
     title: String!
-    questions: [Question!]!
     open: Boolean!
-    ends_at: Date!
+    ends_at: DateInput!
 }
-input ReadForm{
-    id: String!
-}
+
 input UpdateForm{
     id: String!
     title: String!
-    questions: [Question!]!
+    questions: [QuestionInput!]!
     open: Boolean!
-    ends_at: Date!
+    ends_at: DateInput!
 }
-input DeleteForm{
-    id: String!
+
+type Query{
+    # id takes priority if both provided
+    readUser(email: String, id: String): User!
+    readApp(id: String!):Application!
+    readForm(id: String!):Form!
 }
+
 type Mutation{
-    readUser(input: ReadUser!): User!
     createUser(input: CreateUser!): User!
     updateUser(input: UpdateUser!): User!
-    deleteUser(input: DeleteUser!): User!
-    createApp(input:CreateApplication!):Application!
-    readApp(input:ReadApplication!):Application!
-    updateApp(input:UpdateApplication!):Application!
-    deleteApp(input:DeleteApplication!):Application!
+    deleteUser(id: String!): User!
+    createApp(form: String!, user: String!):Application!
+    updateApp(id: String!, responses: [ResponseInput!]):Application!
+    deleteApp(id: String!):Application!
     createForm(input:CreateForm!):Form!
-    readForm(input:ReadForm!):Form!
     updateForm(input:UpdateForm!):Form!
-    deleteForm(input:DeleteForm!):Form!
+    deleteForm(id: String!):Form!
 }
