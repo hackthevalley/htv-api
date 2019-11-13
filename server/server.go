@@ -21,9 +21,9 @@ func main() {
 
 	http.Handle("/playground", authMiddleware(handler.Playground("GraphQL playground", "/query")))
 	http.Handle("/query", authMiddleware(handler.GraphQL(htv_api.NewExecutableSchema(htv_api.Config{Resolvers: &htv_api.Resolver{}}))))
-	http.HandleFunc("/auth/callback",func (w http.ResponseWriter, r *http.Request){
+	http.HandleFunc("/auth/callback", func(w http.ResponseWriter, r *http.Request) {
 		authorizationCode := r.URL.Query().Get("code")
-		if len(authorizationCode)>0{
+		if len(authorizationCode) > 0 {
 			req, err := http.NewRequest("POST", "https://my.mlh.io/oauth/token", nil)
 			if err != nil {
 				log.Fatal(err)
@@ -67,8 +67,6 @@ func authMiddleware(h http.Handler) http.Handler {
 				"client_id=%s&redirect_uri=%s&response_type=code&scope=%s", clientID, redirectURI, scope), 303)
 		}
 		log.Println(htvOauthSessionToken)
-		log.Println(r.Cookies())
-		h.ServeHTTP(w, r) // call original
-		log.Println("After")
+		h.ServeHTTP(w, r)
 	})
 }
