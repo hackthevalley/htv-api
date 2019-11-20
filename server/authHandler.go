@@ -1,9 +1,10 @@
 package main
 
 import (
+	"io/ioutil"
+
 	//"fmt"
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -12,18 +13,12 @@ import (
 
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		//clientID := strings.TrimSpace(os.Getenv("client_id"))
-		//redirectURI := strings.TrimSpace(os.Getenv("redirect_uri"))
-		//scope := strings.TrimSpace(os.Getenv("scope"))
-		htvOauthSessionToken, err := c.Cookie("htvOauthSessionToken")
-		if err != nil {
-			log.Printf("htvOauthSessionToken - %s", err.Error())
-			//c.Redirect(http.StatusTemporaryRedirect,
-			//	fmt.Sprintf("https://my.mlh.io/oauth/authorize?"+
-			//		"client_id=%s&redirect_uri=%s&response_type=code&scope=%s", clientID, redirectURI, scope))
+		authToken := c.GetHeader("Authorization")
+		if authToken != "" {
+			log.Println(authToken)
+			c.Next()
 		}
-		log.Println(htvOauthSessionToken)
-		c.Next()
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"msg": "Authorization Token Not Valid!"})
 	}
 }
 
@@ -47,7 +42,8 @@ func authCallback(c *gin.Context) {
 			log.Printf("Request to MLH token endpoint failed: %s", err)
 			return
 		}
-		authPayload, err := ioutil.ReadAll(response.Body)
+
+		authBody, err := ioutil.ReadAll(response.Body)
 		if err != nil {
 			log.Printf("Could not read in authCode: %s", err)
 		}
@@ -55,13 +51,11 @@ func authCallback(c *gin.Context) {
 		if err != nil {
 			log.Printf("Could not close io read of response body: %s", err)
 		}
-		log.Println(string(authPayload))
-		//c.SetCookie("htvOauthSessionToken",
-		//	string(authPayload),
-		//	60*60*24,
-		//	"/",
-		//	"127.0.0.1",
-		//	true, true)
-		log.Println("Set htvOauthSessionToken cookie")
+		//err = json.Unmarshal(authPayload, &respToken)
+		//if err!=nil{
+		//	log.Println(err)
+		//}
+		log.Println(string(authBody))
+		c.JSON(http.StatusOK, string(authBody))
 	}
 }

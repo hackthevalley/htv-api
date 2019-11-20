@@ -20,13 +20,14 @@ func main() {
 
 	// Setting up Gin
 	r := gin.Default()
-	r.Use(authMiddleware())
-	v1 := r.Group("/v1")
-	{
-		v1.POST("/graphql", graphqlHandler())
-		v1.GET("/playground", playgroundHandler())
-		v1.GET("/auth/callback", authCallback)
-	}
+	privateRoutes := r.Group("/v1")
+	privateRoutes.Use(authMiddleware())
+	privateRoutes.POST("/graphql", graphqlHandler())
+	privateRoutes.GET("/playground", playgroundHandler())
+
+	publicRoutes := r.Group("/v1")
+	publicRoutes.GET("/auth/callback", authCallback)
+
 	err := r.Run()
 	if err != nil {
 		log.Fatal(err)
