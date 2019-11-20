@@ -13,8 +13,8 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		err := os.Setenv("PORT", defaultPort)
-		if err!=nil{
-			log.Fatalf("Could not set default PORT: %s",err)
+		if err != nil {
+			log.Fatalf("Could not set default PORT: %s", err)
 		}
 	}
 

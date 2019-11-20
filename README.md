@@ -17,9 +17,16 @@ verify them and vendor it locally for your projects:
     $ go mod verify
     $ go mod vendor
     ```
-5. Run the following command to start up the graphql playground:
+5. Set the following environment variables for the MLH Oauth middleware:
+    ```bash
+    export client_id=some_id 
+    export client_secret=some_secret
+    export scope=email+education+birthday
+    export redirect_uri=http://localhost:8080/v1/auth/callback
+    ```
+6. Run the following command to start up the graphql playground:
     ```bash
     $ go run ./server/server.go
     ```
-6. Modify `resolver.go` as you go along to add/modify features.
-7. For more information on how gqlgen works, check out the: [docs](https://gqlgen.com/getting-started/)
+7. Modify `resolver.go` as you go along to add/modify features.
+8. For more information on how gqlgen works, check out the: [docs](https://gqlgen.com/getting-started/)
