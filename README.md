@@ -31,7 +31,7 @@ verify them and vendor it locally for your projects:
 7. Modify `resolver.go` as you go along to add/modify features.
 8. Now on your frontend, redirect the user to the following url to initiate the flow<br/>
 (provided you have added `http://localhost:8080/v1/auth/callback` to the redirect url section for your mlh client id)
-    ```bash
+    ```
     https://my.mlh.io/oauth/authorize?client_id=some_client_id&redirect_uri=http://localhost:8080/v1/auth/callback&response_type=code&scope=email+education+birthday
     ```
 8. For more information on how gqlgen works, check out the: [docs](https://gqlgen.com/getting-started/)
