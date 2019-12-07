@@ -5,8 +5,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    env:
-      GOPROXY: "https://proxy.golang.com"
     steps:
 
     - name: Set up Go 1.13.5
