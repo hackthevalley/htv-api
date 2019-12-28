@@ -5,6 +5,20 @@ Hack the Valley 3 API
 </p>
 
 [_powered by gqlgen_](https://gqlgen.com/)
+
+## Pre-requisites:
+1. Spin up MongoDB docker container:
+    ```bash
+    $ docker volume create mongo-data
+    $ docker network create htv-net
+    $ docker run -d --network htv-net -p 27017:27017 -v mongo-data:/data/db --name mongodb -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=password --restart always mongo
+    ```
+2. Spin up Redis docker container:
+    ```bash
+    $ docker volume create redis-data
+    $ docker run --name redis --restart always -d -p 6379:6379 --network htv-net -v redis-data:/data redis redis-server --appendonly yes
+    ```
+
 ## Instructions:
 1. Install and configure Golang for your OS: [Here](https://golang.org/doc/install)
 2. Clone this repository master branch
