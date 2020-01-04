@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/securecookie"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -22,7 +23,6 @@ const defaultRedisHost = "localhost:6379"
 const defaultRedisPassword = ""
 const defaultRedisNumConn = "20"
 const defaultHostUrl = "http://localhost"
-const defaultCookieSecret = "mysupersecret"
 var dbClient *mongo.Database
 
 func main() {
@@ -45,7 +45,7 @@ func main() {
 	r := gin.Default()
 
 	store, err := redis.NewStore(redisNumConn, "tcp", redisHost, redisPass,
-		[]byte(getEnv("COOKIE_SECRET", defaultCookieSecret)))
+		[]byte(getEnv("COOKIE_SECRET", string(securecookie.GenerateRandomKey(256)))))
 
 	store.Options(sessions.Options{
 		// expire session after 1 hour even though mymlh oauth token is valid for 2 hours

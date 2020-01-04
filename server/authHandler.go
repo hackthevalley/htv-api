@@ -14,7 +14,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 )
@@ -28,20 +27,29 @@ type AuthToken struct {
 
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		clientID := strings.TrimSpace(getEnv("client_id", ""))
+		redirectURL := strings.TrimSpace(getEnv("redirect_uri", ""))
+		responseType := strings.TrimSpace(getEnv("response_type", ""))
+		scope := strings.TrimSpace(getEnv("scope", ""))
 		s := sessions.Default(c)
 		authToken := s.Get("htv-token")
 		log.Printf("Recieved auth token: %v", authToken)
-		if authToken == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		userFilter := &bson.M{"sessionID": authToken}
+		query := dbClient.Collection("users").FindOne(ctx, userFilter)
+		log.Printf("Find query: %v", query.Err())
+		if query.Err() != nil {
 			log.Printf("No auth cookie present, redirecting user to login")
 			u, err := url.Parse("https://my.mlh.io/oauth/authorize")
 			if err != nil {
 				log.Print(err)
 			}
 			u.RawQuery = fmt.Sprintf("client_id=%s&redirect_uri=%s&response_type=%s&scope=%s&state=%s",
-				strings.TrimSpace(os.Getenv("client_id")),
-				strings.TrimSpace(os.Getenv("redirect_uri")),
-				strings.TrimSpace(os.Getenv("response_type")),
-				strings.TrimSpace(os.Getenv("scope")),
+				clientID,
+				redirectURL,
+				responseType,
+				scope,
 				c.Request.URL.Path)
 			log.Println(u.String())
 			c.Redirect(http.StatusTemporaryRedirect, u.String())
@@ -106,11 +114,14 @@ func authCallback(c *gin.Context) {
 		return
 	}
 	log.Printf("%+v\n", authToken)
-	sessionToken, err := mapUserSession(authToken)
+	sessionToken, err := uuid.NewRandom()
+	sessionTokenStr := sessionToken.String()
 	if err != nil {
-		log.Printf("Could not map session token in database: %s", err)
+		log.Printf("Could not generate random session token: %s", err)
+		return
 	}
-	s.Set("htv-token", sessionToken)
+	log.Printf("Generated Token: %s", sessionTokenStr)
+	s.Set("htv-token", sessionTokenStr)
 	err = s.Save()
 	if err != nil {
 		log.Printf("Failed to save session token: %s", err)
@@ -118,14 +129,14 @@ func authCallback(c *gin.Context) {
 	}
 	checkToken := s.Get("htv-token")
 	log.Printf("Check token: %v", checkToken)
-	err = createUser(authToken)
+	err = createUser(authToken, sessionTokenStr)
 	if err != nil {
 		log.Printf("Could not create user: %s", err)
 		return
 	}
 	redirectUserState(c)
 }
-func createUser(authToken AuthToken) error {
+func createUser(authToken AuthToken, sessionToken string) error {
 	req, err := http.NewRequest("GET", "https://my.mlh.io/api/v2/user.json", nil)
 	if err != nil {
 		log.Fatalf("Could not form request to MLH user profile endpoint: %s", err)
@@ -155,38 +166,37 @@ func createUser(authToken AuthToken) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		userEmail := gjson.Get(string(profileBody), "data.email").String()
-		res, err := dbClient.Collection("users").InsertOne(ctx, bson.M{
-			"_id":  userEmail,
-			"data": string(profileBody),
-		})
-		if err != nil {
-			log.Printf("Could not insert user into database: %s", err)
-			log.Printf("User probably already exists in database: %s", userEmail)
-			// very very hacky
-			// TODO: properly find existing users before inserting
-			return nil
+		profileMap, ok := gjson.Parse(gjson.Get(string(profileBody), "data").String()).Value().(map[string]interface{})
+		if !ok {
+			log.Printf("Failed to unmarshal profile json, during profile creation")
+			return err
 		}
-		log.Printf("Inserted user to database: %v", res.InsertedID)
+		userFilter := &bson.M{"_id": userEmail}
+		query := dbClient.Collection("users").FindOne(ctx, userFilter)
+		log.Printf("Find query: %v", query.Err())
+		if query.Err() != nil {
+			res, err := dbClient.Collection("users").InsertOne(ctx, bson.M{
+				"_id":       userEmail,
+				"profile":   profileMap,
+				"sessionID": sessionToken,
+			})
+			if err != nil {
+				log.Printf("Could not insert user into database: %s", err)
+				return nil
+			}
+			log.Printf("Inserted user to database: %v", res)
+		} else {
+			res, err := dbClient.Collection("users").ReplaceOne(ctx, userFilter, bson.M{
+				"_id":       userEmail,
+				"profile":   profileMap,
+				"sessionID": sessionToken,
+			})
+			if err != nil {
+				log.Printf("Could not insert user into database: %s", err)
+				return nil
+			}
+			log.Printf("Inserted user to database: %v", res)
+		}
 	}
 	return err
-}
-func mapUserSession(authToken AuthToken) (string, error) {
-	sessionToken, err := uuid.NewRandom()
-	sessionTokenStr := sessionToken.String()
-	if err != nil {
-		log.Printf("Could not generate random session token: %s", err)
-		return "", err
-	}
-	log.Printf("Generated Token: %s", sessionTokenStr)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	res, err := dbClient.Collection("user_tokens").InsertOne(ctx, bson.M{
-		"_id": sessionTokenStr, "authToken": authToken,
-	})
-	if err != nil {
-		log.Printf("Could not insert user token to database: %s", err)
-		return "", err
-	}
-	log.Printf("Inserted user token document to database: %v", res.InsertedID)
-	return sessionTokenStr, err
 }
