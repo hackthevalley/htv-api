@@ -171,14 +171,14 @@ func createUser(authToken AuthToken, sessionToken string) error {
 			log.Printf("Failed to unmarshal profile json, during profile creation")
 			return err
 		}
-		userFilter := &bson.M{"_id": userEmail}
+		userFilter := &bson.M{"email": userEmail}
 		query := dbClient.Collection("users").FindOne(ctx, userFilter)
 		log.Printf("Find query: %v", query.Err())
 		if query.Err() != nil {
 			res, err := dbClient.Collection("users").InsertOne(ctx, bson.M{
-				"_id":       userEmail,
-				"profile":   profileMap,
+				"idpProfile":   profileMap,
 				"sessionID": sessionToken,
+				"email":userEmail,
 			})
 			if err != nil {
 				log.Printf("Could not insert user into database: %s", err)
@@ -187,8 +187,8 @@ func createUser(authToken AuthToken, sessionToken string) error {
 			log.Printf("Inserted user to database: %v", res)
 		} else {
 			res, err := dbClient.Collection("users").ReplaceOne(ctx, userFilter, bson.M{
-				"_id":       userEmail,
-				"profile":   profileMap,
+				"email":userEmail,
+				"idpProfile":   profileMap,
 				"sessionID": sessionToken,
 			})
 			if err != nil {
