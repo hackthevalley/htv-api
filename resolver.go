@@ -158,33 +158,21 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*User, er
 		log.Printf("Error decoding user map or search id is wrong: %s", err)
 		return &user, Errorf("Error decoding user map")
 	}
-	log.Printf("UserMap: %v", userMap)
-	//timestamp := userMap[""]
-	timeStamp := time.Now()
-	user = User{
-		ID:        userMap["_id"].(primitive.ObjectID).Hex(),
-		Links:     []*Link{},
-		Status:    "",
-		Email:     "",
-		Firstname: "",
-		Lastname:  "",
-		Gender:    "",
-		School:    "",
-		Bio:       "",
-		Photo:     "",
-		CreatedAt: &Date{
-			Day:   timeStamp.Day(),
-			Month: int(timeStamp.Month()),
-			Year:  timeStamp.Year(),
-		},
+	var u User
+	err = mapstructure.Decode(userMap["profile"], &u)
+	if err != nil {
+		log.Printf("Error converting user mongo document to struct: %s", err)
+		return &user, Errorf("Error converting user mongo document to struct")
 	}
+	log.Printf("Retrieved profile for user: %v", u.Email)
+
 	res := database.DbClient.Collection("users").FindOneAndDelete(ctx, userFilter)
 	if res.Err() != nil {
 		log.Printf("Could not delete user from database: %v", err)
 		return &user, Errorf("Error deleting user in database")
 	}
-	log.Printf("Deleted user %s to database: %v", userMap["email"].(string), res)
-	return &user, err
+	log.Printf("Deleted user %s from database: %v", u.Email, res)
+	return &u, err
 }
 func (r *mutationResolver) CreateApp(ctx context.Context, form string, user string) (*Application, error) {
 	panic("not implemented")
