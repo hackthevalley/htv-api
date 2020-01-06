@@ -29,12 +29,11 @@ type AuthToken struct {
 
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		clientID := strings.TrimSpace(utils.GetEnv("client_id", ""))
-		redirectURL := strings.TrimSpace(utils.GetEnv("redirect_uri", ""))
-		responseType := strings.TrimSpace(utils.GetEnv("response_type", ""))
-		scope := strings.TrimSpace(utils.GetEnv("scope", ""))
 		s := sessions.Default(c)
 		authToken := s.Get("htv-token")
+		if authToken==nil{
+			redirectUserToAuthPortal(c)
+		}
 		log.Printf("Recieved auth token: %v", authToken)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -42,22 +41,29 @@ func authMiddleware() gin.HandlerFunc {
 		query := database.DbClient.Collection("users").FindOne(ctx, userFilter)
 		log.Printf("Find query: %v", query.Err())
 		if query.Err() != nil {
-			log.Printf("No auth cookie present, redirecting user to login")
-			u, err := url.Parse("https://my.mlh.io/oauth/authorize")
-			if err != nil {
-				log.Print(err)
-			}
-			u.RawQuery = fmt.Sprintf("client_id=%s&redirect_uri=%s&response_type=%s&scope=%s&state=%s",
-				clientID,
-				redirectURL,
-				responseType,
-				scope,
-				c.Request.URL.Path)
-			log.Println(u.String())
-			c.Redirect(http.StatusTemporaryRedirect, u.String())
+			redirectUserToAuthPortal(c)
 		}
 		c.Next()
 	}
+}
+func redirectUserToAuthPortal(c *gin.Context) {
+	clientID := strings.TrimSpace(utils.GetEnv("client_id", ""))
+	redirectURL := strings.TrimSpace(utils.GetEnv("redirect_uri", ""))
+	responseType := strings.TrimSpace(utils.GetEnv("response_type", ""))
+	scope := strings.TrimSpace(utils.GetEnv("scope", ""))
+	log.Printf("No auth cookie present, redirecting user to login")
+	u, err := url.Parse("https://my.mlh.io/oauth/authorize")
+	if err != nil {
+		log.Print(err)
+	}
+	u.RawQuery = fmt.Sprintf("client_id=%s&redirect_uri=%s&response_type=%s&scope=%s&state=%s",
+		clientID,
+		redirectURL,
+		responseType,
+		scope,
+		c.Request.URL.Path)
+	log.Println(u.String())
+	c.Redirect(http.StatusTemporaryRedirect, u.String())
 }
 func retrieveAuthCode(code string) ([] byte, error) {
 	code = strings.TrimSpace(code)
@@ -178,9 +184,9 @@ func createUser(authToken AuthToken, sessionToken string) error {
 		log.Printf("Find query: %v", query.Err())
 		if query.Err() != nil {
 			res, err := database.DbClient.Collection("users").InsertOne(ctx, bson.M{
-				"idpProfile":   profileMap,
-				"sessionID": sessionToken,
-				"email":userEmail,
+				"idpProfile": profileMap,
+				"sessionID":  sessionToken,
+				"email":      userEmail,
 			})
 			if err != nil {
 				log.Printf("Could not insert user into database: %s", err)
@@ -189,9 +195,9 @@ func createUser(authToken AuthToken, sessionToken string) error {
 			log.Printf("Inserted user to database: %v", res)
 		} else {
 			res, err := database.DbClient.Collection("users").ReplaceOne(ctx, userFilter, bson.M{
-				"email":userEmail,
-				"idpProfile":   profileMap,
-				"sessionID": sessionToken,
+				"email":      userEmail,
+				"idpProfile": profileMap,
+				"sessionID":  sessionToken,
 			})
 			if err != nil {
 				log.Printf("Could not insert user into database: %s", err)
