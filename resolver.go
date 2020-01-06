@@ -116,7 +116,46 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input UpdateUser) (*U
 	return &user, err
 }
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*User, error) {
-	panic("not implemented")
+	user := User{}
+	searchID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		log.Printf("Error decoding user id: %s", err)
+		return &user, Errorf("Error decoding user id")
+	}
+	userFilter := &bson.M{"_id": searchID}
+	var userMap bson.M
+	err = database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
+	if err != nil {
+		log.Printf("Error decoding user map or search id is wrong: %s", err)
+		return &user, Errorf("Error decoding user map")
+	}
+	log.Printf("UserMap: %v", userMap)
+	//timestamp := userMap[""]
+	timeStamp := time.Now()
+	user = User{
+		ID:        userMap["_id"].(primitive.ObjectID).Hex(),
+		Links:     []*Link{},
+		Status:    "",
+		Email:     "",
+		Firstname: "",
+		Lastname:  "",
+		Gender:    "",
+		School:    "",
+		Bio:       "",
+		Photo:     "",
+		CreatedAt: &Date{
+			Day:   timeStamp.Day(),
+			Month: int(timeStamp.Month()),
+			Year:  timeStamp.Year(),
+		},
+	}
+	res := database.DbClient.Collection("users").FindOneAndDelete(ctx, userFilter)
+	if res.Err() != nil {
+		log.Printf("Could not delete user from database: %v", err)
+		return &user, Errorf("Error deleting user in database")
+	}
+	log.Printf("Deleted user %s to database: %v", userMap["email"].(string), res)
+	return &user, err
 }
 func (r *mutationResolver) CreateApp(ctx context.Context, form string, user string) (*Application, error) {
 	panic("not implemented")
@@ -140,7 +179,49 @@ func (r *mutationResolver) DeleteForm(ctx context.Context, id string) (*Form, er
 type queryResolver struct{ *Resolver }
 
 func (r *queryResolver) ReadUser(ctx context.Context, email *string, id *string) (*User, error) {
-	panic("not implemented")
+	//user := User{}
+	//userFilter := &bson.M{"email": *email, "_id": primitive.ObjectIDFromHex(*id)}
+	//var userMap bson.M
+	//err := database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
+	//
+	//if err != nil {
+	//	log.Printf("Error decoding user map: %s", err)
+	//	return &user, Errorf("Error decoding user map")
+	//}
+	//log.Printf("UserMap: %v", userMap)
+	//
+	////timestamp := userMap[""]
+	//timeStamp := time.Now()
+	//user = User{
+	//	ID:        userMap["_id"].(primitive.ObjectID).Hex(),
+	//	Links:     MapLinks(input.Links),
+	//	Status:    *input.Status,
+	//	Email:     *input.Email,
+	//	Firstname: *input.Firstname,
+	//	Lastname:  *input.Lastname,
+	//	Gender:    *input.Gender,
+	//	School:    *input.School,
+	//	Bio:       *input.Bio,
+	//	Photo:     *input.Photo,
+	//	CreatedAt: &Date{
+	//		Day:   timeStamp.Day(),
+	//		Month: int(timeStamp.Month()),
+	//		Year:  timeStamp.Year(),
+	//	},
+	//}
+	//res := database.DbClient.Collection("users").FindOneAndUpdate(ctx, userFilter, bson.M{
+	//	"$set": bson.M{
+	//		"profile": &user,
+	//	},
+	//})
+	//if res.Err() != nil {
+	//	log.Printf("Could not update user into database: %v", err)
+	//	return &user, Errorf("Error updating user into database")
+	//}
+	//log.Printf("Updated user %s to database: %v", *input.Email, res)
+	//return &user, err
+	////panic("not implemented")
+
 }
 func (r *queryResolver) ReadApp(ctx context.Context, id string) (*Application, error) {
 	panic("not implemented")
