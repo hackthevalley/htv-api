@@ -220,8 +220,7 @@ func (r *queryResolver) ReadUser(ctx context.Context, email *string, id *string)
 	//}
 	//log.Printf("Updated user %s to database: %v", *input.Email, res)
 	//return &user, err
-	////panic("not implemented")
-
+	panic("not implemented")
 }
 func (r *queryResolver) ReadApp(ctx context.Context, id string) (*Application, error) {
 	panic("not implemented")
