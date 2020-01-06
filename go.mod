@@ -12,8 +12,10 @@ require (
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
 	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/google/uuid v1.1.1
+	github.com/gorilla/securecookie v1.1.1
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.8 // indirect
+	github.com/mitchellh/mapstructure v0.0.0-20180203102830-a4e142e9c047
 	github.com/tidwall/gjson v1.3.5
 	github.com/vektah/gqlparser v1.1.2
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect

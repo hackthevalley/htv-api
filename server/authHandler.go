@@ -31,7 +31,7 @@ func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		s := sessions.Default(c)
 		authToken := s.Get("htv-token")
-		if authToken==nil{
+		if authToken == nil {
 			redirectUserToAuthPortal(c)
 		}
 		log.Printf("Recieved auth token: %v", authToken)
@@ -39,8 +39,8 @@ func authMiddleware() gin.HandlerFunc {
 		defer cancel()
 		userFilter := &bson.M{"sessionID": authToken}
 		query := database.DbClient.Collection("users").FindOne(ctx, userFilter)
-		log.Printf("Find query: %v", query.Err())
 		if query.Err() != nil {
+			log.Printf("Find query: %v", query.Err())
 			redirectUserToAuthPortal(c)
 		}
 		c.Next()
@@ -194,10 +194,12 @@ func createUser(authToken AuthToken, sessionToken string) error {
 			}
 			log.Printf("Inserted user to database: %v", res)
 		} else {
-			res, err := database.DbClient.Collection("users").ReplaceOne(ctx, userFilter, bson.M{
-				"email":      userEmail,
-				"idpProfile": profileMap,
-				"sessionID":  sessionToken,
+			res, err := database.DbClient.Collection("users").UpdateOne(ctx, userFilter, bson.M{
+				"$set": bson.M{
+					"email":      userEmail,
+					"idpProfile": profileMap,
+					"sessionID":  sessionToken,
+				},
 			})
 			if err != nil {
 				log.Printf("Could not insert user into database: %s", err)
