@@ -61,6 +61,8 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	r.Use(utils.GinContextToContextMiddleware())
+
 	privateRoutes := r.Group("/v1")
 	privateRoutes.Use(authMiddleware())
 	privateRoutes.POST("/graphql", graphqlHandler())

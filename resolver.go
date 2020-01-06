@@ -2,7 +2,9 @@ package htv_api
 
 import (
 	"context"
+	"github.com/gin-contrib/sessions"
 	"github.com/hackthevalley/htv-api/database"
+	"github.com/hackthevalley/htv-api/utils"
 	. "github.com/vektah/gqlparser/gqlerror"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -36,12 +38,19 @@ type mutationResolver struct{ *Resolver }
 
 func (r *mutationResolver) CreateUser(ctx context.Context, input CreateUser) (*User, error) {
 	user := User{}
-	userFilter := &bson.M{"email": input.Email}
-	var userMap bson.M
-	err := database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
+	gc, err := utils.GinContextFromContext(ctx)
 	if err != nil {
-		log.Printf("Error decoding user map: %s", err)
-		return &user, Errorf("Error decoding user map")
+		log.Printf("Error extracting context: %s", err)
+		return &user, Errorf("Error extracting context")
+	}
+	s := sessions.Default(gc)
+	authToken := s.Get("htv-token")
+	userFilter := &bson.M{"email": input.Email, "sessionID": authToken}
+	var userMap bson.M
+	err = database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
+	if err != nil {
+		log.Printf("Error decoding user map or unauthorized action: %s", err)
+		return &user, Errorf("Error decoding user map or unauthorized action")
 	}
 	log.Printf("UserMap: %v", userMap)
 	timeStamp := time.Now()
@@ -76,9 +85,16 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input CreateUser) (*U
 }
 func (r *mutationResolver) UpdateUser(ctx context.Context, input UpdateUser) (*User, error) {
 	user := User{}
-	userFilter := &bson.M{"email": input.Email}
+	gc, err := utils.GinContextFromContext(ctx)
+	if err != nil {
+		log.Printf("Error extracting context: %s", err)
+		return &user, Errorf("Error extracting context")
+	}
+	s := sessions.Default(gc)
+	authToken := s.Get("htv-token")
+	userFilter := &bson.M{"email": input.Email, "sessionID": authToken}
 	var userMap bson.M
-	err := database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
+	err = database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
 	if err != nil {
 		log.Printf("Error decoding user map: %s", err)
 		return &user, Errorf("Error decoding user map")
@@ -117,12 +133,19 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input UpdateUser) (*U
 }
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*User, error) {
 	user := User{}
+	gc, err := utils.GinContextFromContext(ctx)
+	if err != nil {
+		log.Printf("Error extracting context: %s", err)
+		return &user, Errorf("Error extracting context")
+	}
+	s := sessions.Default(gc)
+	authToken := s.Get("htv-token")
 	searchID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Printf("Error decoding user id: %s", err)
 		return &user, Errorf("Error decoding user id")
 	}
-	userFilter := &bson.M{"_id": searchID}
+	userFilter := &bson.M{"_id": searchID, "sessionID": authToken}
 	var userMap bson.M
 	err = database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
 	if err != nil {
