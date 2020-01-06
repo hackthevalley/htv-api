@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"log"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func getEnv(key string, fallback string) string {
+func GetEnv(key string, fallback string) string {
 	key = strings.TrimSpace(key)
 	fallback = strings.TrimSpace(fallback)
 	value := strings.TrimSpace(os.Getenv(key))

@@ -1,16 +1,14 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/securecookie"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"github.com/hackthevalley/htv-api/database"
+	"github.com/hackthevalley/htv-api/utils"
 	"log"
 	"strconv"
 	"time"
@@ -23,29 +21,27 @@ const defaultRedisHost = "localhost:6379"
 const defaultRedisPassword = ""
 const defaultRedisNumConn = "20"
 const defaultHostUrl = "http://localhost"
-var dbClient *mongo.Database
 
 func main() {
-	port := getEnv("PORT", defaultPort)
-	hostURL := fmt.Sprintf("%s:%s", getEnv("HOST_URL", defaultHostUrl), port)
-	redisHost := getEnv("REDIS_HOST", defaultRedisHost)
-	redisPass := getEnv("REDIS_PASS", defaultRedisPassword)
-	redisNumConn, err := strconv.Atoi(getEnv("REDIS_NUM_CONN", defaultRedisNumConn))
+	port := utils.GetEnv("PORT", defaultPort)
+	hostURL := fmt.Sprintf("%s:%s", utils.GetEnv("HOST_URL", defaultHostUrl), port)
+	redisHost := utils.GetEnv("REDIS_HOST", defaultRedisHost)
+	redisPass := utils.GetEnv("REDIS_PASS", defaultRedisPassword)
+	redisNumConn, err := strconv.Atoi(utils.GetEnv("REDIS_NUM_CONN", defaultRedisNumConn))
 	if err != nil {
 		log.Fatalf("Could not parse number of idle redis connections: %s", err)
 	}
-	useSecureCookies, err := strconv.ParseBool(getEnv("USE_SECURE_COOKIES", "false"))
-	if err!=nil{
+	useSecureCookies, err := strconv.ParseBool(utils.GetEnv("USE_SECURE_COOKIES", "false"))
+	if err != nil {
 		log.Fatalf("Could not parse useSecureCookies bool: %s", err)
 	}
 
 	// initialize db client
-	dbClient = retrieveDatabaseConn()
+	database.DbClient = database.RetrieveDatabaseConn(defaultDbUrl, defaultDbName)
 	// Setting up Gin
 	r := gin.Default()
-
 	store, err := redis.NewStore(redisNumConn, "tcp", redisHost, redisPass,
-		[]byte(getEnv("COOKIE_SECRET", string(securecookie.GenerateRandomKey(256)))))
+		[]byte(utils.GetEnv("COOKIE_SECRET", string(securecookie.GenerateRandomKey(256)))))
 
 	store.Options(sessions.Options{
 		// expire session after 1 hour even though mymlh oauth token is valid for 2 hours
@@ -80,19 +76,4 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not run Gin router: %s", err)
 	}
-
-}
-func retrieveDatabaseConn() *mongo.Database {
-	dbURL := getEnv("DB_URL", defaultDbUrl)
-	dbName := getEnv("DB_NAME", defaultDbName)
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(dbURL))
-	if err != nil {
-		log.Fatalf("Could not connect to database: %s", err)
-	}
-	err = client.Ping(ctx, readpref.Primary())
-	if err != nil {
-		log.Fatalf("Database could not be pinged: %s", err)
-	}
-	return client.Database(dbName)
 }

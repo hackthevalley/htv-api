@@ -8,6 +8,8 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/hackthevalley/htv-api/database"
+	"github.com/hackthevalley/htv-api/utils"
 	"github.com/tidwall/gjson"
 	"go.mongodb.org/mongo-driver/bson"
 	"io/ioutil"
@@ -27,17 +29,17 @@ type AuthToken struct {
 
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		clientID := strings.TrimSpace(getEnv("client_id", ""))
-		redirectURL := strings.TrimSpace(getEnv("redirect_uri", ""))
-		responseType := strings.TrimSpace(getEnv("response_type", ""))
-		scope := strings.TrimSpace(getEnv("scope", ""))
+		clientID := strings.TrimSpace(utils.GetEnv("client_id", ""))
+		redirectURL := strings.TrimSpace(utils.GetEnv("redirect_uri", ""))
+		responseType := strings.TrimSpace(utils.GetEnv("response_type", ""))
+		scope := strings.TrimSpace(utils.GetEnv("scope", ""))
 		s := sessions.Default(c)
 		authToken := s.Get("htv-token")
 		log.Printf("Recieved auth token: %v", authToken)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		userFilter := &bson.M{"sessionID": authToken}
-		query := dbClient.Collection("users").FindOne(ctx, userFilter)
+		query := database.DbClient.Collection("users").FindOne(ctx, userFilter)
 		log.Printf("Find query: %v", query.Err())
 		if query.Err() != nil {
 			log.Printf("No auth cookie present, redirecting user to login")
@@ -66,10 +68,10 @@ func retrieveAuthCode(code string) ([] byte, error) {
 			return []byte(""), err
 		}
 		q := req.URL.Query()
-		q.Add("client_id", getEnv("client_id", ""))
-		q.Add("client_secret", getEnv("client_secret", ""))
-		q.Add("redirect_uri", getEnv("redirect_uri", ""))
-		q.Add("grant_type", getEnv("grant_type", ""))
+		q.Add("client_id", utils.GetEnv("client_id", ""))
+		q.Add("client_secret", utils.GetEnv("client_secret", ""))
+		q.Add("redirect_uri", utils.GetEnv("redirect_uri", ""))
+		q.Add("grant_type", utils.GetEnv("grant_type", ""))
 		q.Add("code", code)
 		req.URL.RawQuery = q.Encode()
 
@@ -172,10 +174,10 @@ func createUser(authToken AuthToken, sessionToken string) error {
 			return err
 		}
 		userFilter := &bson.M{"email": userEmail}
-		query := dbClient.Collection("users").FindOne(ctx, userFilter)
+		query := database.DbClient.Collection("users").FindOne(ctx, userFilter)
 		log.Printf("Find query: %v", query.Err())
 		if query.Err() != nil {
-			res, err := dbClient.Collection("users").InsertOne(ctx, bson.M{
+			res, err := database.DbClient.Collection("users").InsertOne(ctx, bson.M{
 				"idpProfile":   profileMap,
 				"sessionID": sessionToken,
 				"email":userEmail,
@@ -186,7 +188,7 @@ func createUser(authToken AuthToken, sessionToken string) error {
 			}
 			log.Printf("Inserted user to database: %v", res)
 		} else {
-			res, err := dbClient.Collection("users").ReplaceOne(ctx, userFilter, bson.M{
+			res, err := database.DbClient.Collection("users").ReplaceOne(ctx, userFilter, bson.M{
 				"email":userEmail,
 				"idpProfile":   profileMap,
 				"sessionID": sessionToken,

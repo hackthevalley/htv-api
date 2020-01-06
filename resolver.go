@@ -2,7 +2,26 @@ package htv_api
 
 import (
 	"context"
+	"github.com/hackthevalley/htv-api/database"
+	. "github.com/vektah/gqlparser/gqlerror"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"log"
+	"time"
 ) // THIS CODE IS A STARTING POINT ONLY. IT WILL NOT BE UPDATED WITH SCHEMA CHANGES.
+
+func MapLinks(links []*LinkInput) []*Link {
+	var linkArr []*Link
+
+	for _, elem := range links {
+		link := Link{
+			Label: elem.Label,
+			URL:   elem.URL,
+		}
+		linkArr = append(linkArr, &link)
+	}
+	return linkArr
+}
 
 type Resolver struct{}
 
@@ -16,10 +35,85 @@ func (r *Resolver) Query() QueryResolver {
 type mutationResolver struct{ *Resolver }
 
 func (r *mutationResolver) CreateUser(ctx context.Context, input CreateUser) (*User, error) {
-	panic("not implemented")
+	user := User{}
+	userFilter := &bson.M{"email": input.Email}
+	var userMap bson.M
+	err := database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
+	if err != nil {
+		log.Printf("Error decoding user map: %s", err)
+		return &user, Errorf("Error decoding user map")
+	}
+	log.Printf("UserMap: %v", userMap)
+	timeStamp := time.Now()
+	user = User{
+		ID:        userMap["_id"].(primitive.ObjectID).Hex(),
+		Links:     MapLinks(input.Links),
+		Status:    "",
+		Email:     input.Email,
+		Firstname: *input.Firstname,
+		Lastname:  *input.Lastname,
+		Gender:    *input.Gender,
+		School:    *input.School,
+		Bio:       *input.Bio,
+		Photo:     *input.Photo,
+		CreatedAt: &Date{
+			Day:   timeStamp.Day(),
+			Month: int(timeStamp.Month()),
+			Year:  timeStamp.Year(),
+		},
+	}
+	res := database.DbClient.Collection("users").FindOneAndUpdate(ctx, userFilter, bson.M{
+		"$set": bson.M{
+			"profile": &user,
+		},
+	})
+	if res.Err() != nil {
+		log.Printf("Could not insert user into database: %v", err)
+		return &user, Errorf("Error inserting user into database")
+	}
+	log.Printf("Inserted user to database: %v", res)
+	return &user, err
 }
 func (r *mutationResolver) UpdateUser(ctx context.Context, input UpdateUser) (*User, error) {
-	panic("not implemented")
+	user := User{}
+	userFilter := &bson.M{"email": input.Email}
+	var userMap bson.M
+	err := database.DbClient.Collection("users").FindOne(ctx, userFilter).Decode(&userMap)
+	if err != nil {
+		log.Printf("Error decoding user map: %s", err)
+		return &user, Errorf("Error decoding user map")
+	}
+	log.Printf("UserMap: %v", userMap)
+	//timestamp := userMap[""]
+	timeStamp := time.Now()
+	user = User{
+		ID:        userMap["_id"].(primitive.ObjectID).Hex(),
+		Links:     MapLinks(input.Links),
+		Status:    *input.Status,
+		Email:     *input.Email,
+		Firstname: *input.Firstname,
+		Lastname:  *input.Lastname,
+		Gender:    *input.Gender,
+		School:    *input.School,
+		Bio:       *input.Bio,
+		Photo:     *input.Photo,
+		CreatedAt: &Date{
+			Day:   timeStamp.Day(),
+			Month: int(timeStamp.Month()),
+			Year:  timeStamp.Year(),
+		},
+	}
+	res := database.DbClient.Collection("users").FindOneAndUpdate(ctx, userFilter, bson.M{
+		"$set": bson.M{
+			"profile": &user,
+		},
+	})
+	if res.Err() != nil {
+		log.Printf("Could not update user into database: %v", err)
+		return &user, Errorf("Error updating user into database")
+	}
+	log.Printf("Updated user %s to database: %v", *input.Email, res)
+	return &user, err
 }
 func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*User, error) {
 	panic("not implemented")
