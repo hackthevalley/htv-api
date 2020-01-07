@@ -35,6 +35,25 @@ func MapDate(dateInp *DateInput) *Date {
 		Year:  dateInp.Year,
 	}
 }
+func MapResponses(responseInp []*ResponseInput) []*Response {
+	var responseArr []*Response
+	for _, elem := range responseInp {
+		resp := Response{
+			Question: &Question{
+				ID:       elem.Question.ID,
+				Title:    elem.Question.Title,
+				Info:     elem.Question.Info,
+				Options:  elem.Question.Options,
+				Default:  elem.Question.Default,
+				Type:     elem.Question.Type,
+				Required: elem.Question.Required,
+			},
+			Answer: elem.Answer,
+		}
+		responseArr = append(responseArr, &resp)
+	}
+	return responseArr
+}
 func MapQuestions(quesInp []*QuestionInput) []*Question {
 	var questionArr []*Question
 	for _, elem := range quesInp {
@@ -204,13 +223,117 @@ func (r *mutationResolver) DeleteUser(ctx context.Context, id string) (*User, er
 	return &u, err
 }
 func (r *mutationResolver) CreateApp(ctx context.Context, form string, user string) (*Application, error) {
-	panic("not implemented")
+	dbctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	gc, err := utils.GinContextFromContext(ctx)
+	if err != nil {
+		log.Printf("Error extracting context: %s", err)
+		return &Application{}, Errorf("Error extracting session context")
+	}
+	s := sessions.Default(gc)
+	authToken := s.Get("htv-token")
+	searchID, err := primitive.ObjectIDFromHex(user)
+	userFilter := &bson.M{"_id": searchID, "sessionID": authToken}
+	var userMap bson.M
+	err = database.DbClient.Collection("users").FindOne(dbctx, userFilter).Decode(&userMap)
+	if err != nil {
+		log.Printf("Error decoding user map: %s", err)
+		return &Application{}, Errorf("Error decoding user map")
+	}
+	var u User
+	err = mapstructure.Decode(userMap["profile"], &u)
+	if err != nil {
+		log.Printf("Error converting user mongo document to struct: %s", err)
+		return &Application{}, Errorf("Error converting user mongo document to struct")
+	}
+	formInp, err := RetrieveForm(form)
+	if err != nil {
+		log.Printf("Failed to retrieve associated form from database: %v", err)
+		return &Application{}, Errorf("Failed to retrieve associated form from database")
+	}
+	timeStamp := time.Now()
+	now := &Date{
+		Day:   timeStamp.Day(),
+		Month: int(timeStamp.Month()),
+		Year:  timeStamp.Year(),
+	}
+	newApp := Application{
+		ID:        "",
+		CreatedAt: now,
+		UpdatedAt: now,
+		Form:      formInp,
+		User:      &u,
+		Responses: []*Response{},
+	}
+	res, err := database.DbClient.Collection("apps").InsertOne(dbctx, newApp)
+	if err != nil {
+		log.Printf("Failed to insert application into database: %v", err)
+		return &Application{}, Errorf("Failed to insert application into database")
+	}
+	insertedID := res.InsertedID.(primitive.ObjectID)
+	log.Printf("Inserted application: %v", insertedID)
+	appFilter := &bson.M{"_id": res.InsertedID}
+	upres := database.DbClient.Collection("apps").FindOneAndUpdate(dbctx, appFilter, bson.M{
+		"$set": bson.M{
+			"id": insertedID.Hex(),
+		},
+	})
+	if upres.Err() != nil {
+		log.Printf("Failed to upsert application into database: %v", err)
+		return &Application{}, Errorf("Failed to upsert application into database")
+	}
+	newApp.ID = insertedID.Hex()
+	return &newApp, err
+
 }
 func (r *mutationResolver) UpdateApp(ctx context.Context, id string, responses []*ResponseInput) (*Application, error) {
-	panic("not implemented")
+	dbctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	app, err := RetrieveApp(ctx, id)
+	if err != nil {
+		log.Printf("Could not retrieve app from database: %v", err)
+		return &Application{}, Errorf("Could not retrieve app from database")
+	}
+	timeStamp := time.Now()
+	appUpdate := Application{
+		ID:        app.ID,
+		CreatedAt: app.CreatedAt,
+		UpdatedAt: &Date{
+			Day:   timeStamp.Day(),
+			Month: int(timeStamp.Month()),
+			Year:  timeStamp.Year(),
+		},
+		Form:      app.Form,
+		User:      app.User,
+		Responses: MapResponses(responses),
+	}
+	searchID, err := primitive.ObjectIDFromHex(app.ID)
+	appFilter := &bson.M{"_id": searchID}
+	res := database.DbClient.Collection("apps").FindOneAndUpdate(dbctx, appFilter, bson.M{
+		"$set": appUpdate,
+	})
+	if res.Err() != nil {
+		log.Printf("Could not update app in database: %v", err)
+		return &Application{}, Errorf("Could not update app in database")
+	}
+	return &appUpdate, err
 }
 func (r *mutationResolver) DeleteApp(ctx context.Context, id string) (*Application, error) {
-	panic("not implemented")
+	dbctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	app, err := RetrieveApp(ctx, id)
+	if err != nil {
+		log.Printf("Could not retrieve app from database: %v", err)
+		return &Application{}, Errorf("Could not retrieve app from database")
+	}
+	searchID, err := primitive.ObjectIDFromHex(app.ID)
+	appFilter := &bson.M{"_id": searchID}
+	res := database.DbClient.Collection("apps").FindOneAndDelete(dbctx, appFilter)
+	if res.Err() != nil {
+		log.Printf("Could not delete app in database: %v", err)
+		return &Application{}, Errorf("Could not delete app in database")
+	}
+	return app, err
 }
 func (r *mutationResolver) CreateForm(ctx context.Context, input CreateForm) (*Form, error) {
 	dbctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -317,6 +440,39 @@ func (r *mutationResolver) DeleteForm(ctx context.Context, id string) (*Form, er
 type queryResolver struct{ *Resolver }
 
 func (r *queryResolver) ReadUser(ctx context.Context, email *string, id *string) (*User, error) {
+	return RetrieveUser(ctx, email, id)
+}
+func (r *queryResolver) ReadApp(ctx context.Context, id string) (*Application, error) {
+	return RetrieveApp(ctx, id)
+}
+func (r *queryResolver) ReadForm(ctx context.Context, id string) (*Form, error) {
+	return RetrieveForm(id)
+}
+func RetrieveApp(ctx context.Context, id string) (*Application, error) {
+	dbctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	searchID, err := primitive.ObjectIDFromHex(id)
+	appFilter := &bson.M{"_id": searchID}
+	var appMap bson.M
+	err = database.DbClient.Collection("apps").FindOne(dbctx, appFilter).Decode(&appMap)
+	if err != nil {
+		log.Printf("Error decoding app map: %s", err)
+		return &Application{}, Errorf("Error decoding app map")
+	}
+	var app Application
+	err = mapstructure.Decode(appMap, &app)
+	if err != nil {
+		log.Printf("Error converting app mongo document to struct: %s", err)
+		return &Application{}, Errorf("Error converting app mongo document to struct")
+	}
+	_, err = RetrieveUser(ctx, &app.User.Email, &app.User.ID)
+	if err != nil {
+		log.Printf("Unauthorized retrieval of application: %s", err)
+		return &Application{}, Errorf("Unauthorized retrieval of application")
+	}
+	return &app, err
+}
+func RetrieveUser(ctx context.Context, email *string, id *string) (*User, error) {
 	user := User{}
 	gc, err := utils.GinContextFromContext(ctx)
 	if err != nil {
@@ -346,10 +502,7 @@ func (r *queryResolver) ReadUser(ctx context.Context, email *string, id *string)
 
 	return &u, err
 }
-func (r *queryResolver) ReadApp(ctx context.Context, id string) (*Application, error) {
-	panic("not implemented")
-}
-func (r *queryResolver) ReadForm(ctx context.Context, id string) (*Form, error) {
+func RetrieveForm(id string) (*Form, error) {
 	dbctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	searchID, err := primitive.ObjectIDFromHex(id)
